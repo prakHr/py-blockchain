@@ -1,9 +1,12 @@
+
 def create_app():
+    list_of_strings = []
+
     from dash import Dash, dcc, html, Input, Output, State, callback
     import dash_bootstrap_components as dbc
     from justblockchain import justblockchain
     import secrets
-
+    import math
 
     # --------------------------------------------------
     # ALL AVAILABLE THEMES
@@ -38,7 +41,6 @@ def create_app():
         "Zephyr": dbc.themes.ZEPHYR,
     }
 
-
     # --------------------------------------------------
     # INITIALIZE DASH APPLICATION
     # --------------------------------------------------
@@ -48,17 +50,14 @@ def create_app():
         external_stylesheets=[dbc.themes.BOOTSTRAP]
     )
 
-
     # --------------------------------------------------
     # GLOBAL BLOCKCHAIN DATA
     # --------------------------------------------------
 
     list_of_strings = []
 
-
     def generate_random_hash():
         return secrets.token_hex(32)
-
 
     def create_blockchains(strings):
 
@@ -76,7 +75,6 @@ def create_app():
 
         return blockchains
 
-
     # --------------------------------------------------
     # APPLICATION LAYOUT
     # --------------------------------------------------
@@ -84,7 +82,6 @@ def create_app():
     app.layout = dbc.Container(
         [
 
-            # Application heading
             html.H1(
                 "Blockchain Explorer",
                 className="text-center my-4"
@@ -92,7 +89,7 @@ def create_app():
 
             html.Hr(),
 
-            # Theme selector
+            # THEME SELECTOR
             dbc.Row(
                 [
                     dbc.Col(
@@ -101,7 +98,6 @@ def create_app():
 
                             dcc.Dropdown(
                                 id="theme-selector",
-
                                 options=[
                                     {
                                         "label": theme,
@@ -109,11 +105,9 @@ def create_app():
                                     }
                                     for theme in THEMES
                                 ],
-
                                 value="Bootstrap",
                                 clearable=False
                             )
-
                         ],
                         md=4
                     )
@@ -121,13 +115,12 @@ def create_app():
                 className="mb-4"
             ),
 
-            # Hidden output for theme callback
             html.Div(
                 id="theme-output",
                 style={"display": "none"}
             ),
 
-            # Input card
+            # INPUT CARD
             dbc.Card(
                 dbc.CardBody(
                     [
@@ -167,19 +160,78 @@ def create_app():
                 className="mb-4"
             ),
 
-            # Blockchain records heading
+            # BLOCKCHAIN RECORDS
             html.H3(
                 "Blockchain Records",
                 className="mb-3"
             ),
 
-            # Blockchain output
+            # RECORD COUNT AND PAGE SIZE
+            dbc.Row(
+                [
+
+                    dbc.Col(
+                        [
+                            dbc.Label("Records per page"),
+
+                            dcc.Dropdown(
+                                id="page-size",
+                                options=[
+                                    {"label": "5", "value": 5},
+                                    {"label": "10", "value": 10},
+                                    {"label": "20", "value": 20},
+                                    {"label": "50", "value": 50}
+                                ],
+                                value=5,
+                                clearable=False
+                            )
+                        ],
+                        md=3
+                    ),
+
+                    dbc.Col(
+                        html.Div(
+                            id="record-count",
+                            className="text-end mt-4"
+                        ),
+                        md=9
+                    )
+
+                ],
+                className="mb-3"
+            ),
+
+            # BLOCKCHAIN RECORD OUTPUT
             html.Div(
                 id="container-button-basic",
                 children=dbc.Alert(
                     "Enter a value and press Add Block.",
                     color="info"
                 )
+            ),
+
+            # PAGINATION
+            html.Div(
+                [
+
+                    dbc.Pagination(
+                        id="pagination",
+                        active_page=1,
+                        max_value=1,
+                        fully_expanded=False,
+                        first_last=True,
+                        previous_next=True,
+                        className="justify-content-center mt-4"
+                    )
+
+                ]
+            ),
+
+            html.Hr(),
+
+            html.Div(
+                id="page-information",
+                className="text-center text-muted mb-3"
             )
 
         ],
@@ -187,7 +239,6 @@ def create_app():
         fluid=True,
         className="p-4"
     )
-
 
     # --------------------------------------------------
     # DYNAMIC THEME SWITCHING
@@ -237,21 +288,15 @@ def create_app():
             let link = document.getElementById("theme-stylesheet");
 
             if (!link) {
-
                 link = document.createElement("link");
-
                 link.id = "theme-stylesheet";
-
                 link.rel = "stylesheet";
-
                 document.head.appendChild(link);
-
             }
 
             link.href = stylesheet;
 
             return theme;
-
         }
         """,
 
@@ -261,16 +306,29 @@ def create_app():
 
     )
 
-
     # --------------------------------------------------
-    # ADD BLOCK CALLBACK
+    # COMMON PAGINATION CALLBACK
     # --------------------------------------------------
 
     @callback(
 
         Output("container-button-basic", "children"),
 
+        Output("pagination", "max_value"),
+
+        Output("pagination", "active_page"),
+
+        Output("record-count", "children"),
+
+        Output("page-information", "children"),
+
+        Input("pagination", "active_page"),
+
+        Input("page-size", "value"),
+
         Input("submit-value", "n_clicks"),
+
+        Input("submit-value2", "n_clicks"),
 
         State("input-on-submit", "value"),
 
@@ -278,28 +336,108 @@ def create_app():
 
     )
 
-    def submit_input(n_clicks, value):
+    def update_blockchain(
+        active_page,
+        page_size,
+        add_clicks,
+        delete_clicks,
+        value
+    ):
 
-        global list_of_strings
+        from dash import ctx, no_update
 
-        # Validate input
-        if not value or not value.strip():
+        
 
-            return dbc.Alert(
-                "Please enter a valid value.",
-                color="warning"
+        triggered = ctx.triggered_id
+
+        # ----------------------------------------------
+        # ADD BLOCK
+        # ----------------------------------------------
+
+        if triggered == "submit-value":
+            
+
+
+            if not value or not value.strip():
+
+                return (
+                    dbc.Alert(
+                        "Please enter a valid value.",
+                        color="warning"
+                    ),
+                    no_update,
+                    no_update,
+                    no_update,
+                    no_update
+                )
+
+            list_of_strings.append(value.strip())
+
+            active_page = 1
+
+        # ----------------------------------------------
+        # DELETE ALL BLOCKS
+        # ----------------------------------------------
+
+        elif triggered == "submit-value2":
+
+            
+            return (
+                dbc.Alert(
+                    "All blockchain records have been deleted.",
+                    color="success"
+                ),
+                1,
+                1,
+                "Total Records: 0",
+                "Page 1 of 1"
             )
 
-        # Add input to blockchain data
-        list_of_strings.append(value.strip())
+        # ----------------------------------------------
+        # GENERATE BLOCKCHAIN
+        # ----------------------------------------------
 
-        # Generate blockchain
         blockchains = create_blockchains(list_of_strings)
+
+        total_records = len(blockchains)
+
+        # ----------------------------------------------
+        # CALCULATE TOTAL PAGES
+        # ----------------------------------------------
+
+        total_pages = max(
+            1,
+            math.ceil(total_records / page_size)
+        )
+
+        # Ensure current page is valid
+        active_page = min(
+            max(active_page or 1, 1),
+            total_pages
+        )
+
+        # ----------------------------------------------
+        # PAGINATION INDEX
+        # ----------------------------------------------
+
+        start_index = (active_page - 1) * page_size
+
+        end_index = start_index + page_size
+
+        paginated_blocks = blockchains[
+            start_index:end_index
+        ]
+
+        # ----------------------------------------------
+        # DISPLAY BLOCKCHAIN RECORDS
+        # ----------------------------------------------
 
         components = []
 
-        # Display blockchain records
-        for index, block in enumerate(blockchains):
+        for index, block in enumerate(
+            paginated_blocks,
+            start=start_index + 1
+        ):
 
             component = dbc.Card(
 
@@ -307,13 +445,16 @@ def create_app():
                     [
 
                         html.H5(
-                            f"Block #{index + 1}",
+                            f"Block #{index}",
                             className="card-title"
                         ),
 
                         *[
                             html.P(
-                                f"{key}: {val}"
+                                f"{key}: {val}",
+                                style={
+                                    "wordBreak": "break-word"
+                                }
                             )
                             for key, val in block.items()
                         ]
@@ -327,41 +468,56 @@ def create_app():
 
             components.append(component)
 
-        return components
+        if not components:
 
+            components = [
+                dbc.Alert(
+                    "No blockchain records available.",
+                    color="info"
+                )
+            ]
 
-    # --------------------------------------------------
-    # DELETE ALL BLOCKS CALLBACK
-    # --------------------------------------------------
+        # ----------------------------------------------
+        # RECORD COUNT
+        # ----------------------------------------------
 
-    @callback(
+        record_count = html.H6(
+            f"Total Records: {total_records}"
+        )
 
-        Output(
-            "container-button-basic",
-            "children",
-            allow_duplicate=True
-        ),
+        # ----------------------------------------------
+        # PAGE INFORMATION
+        # ----------------------------------------------
 
-        Input("submit-value2", "n_clicks"),
+        page_information = (
+            f"Showing records {start_index + 1} "
+            f"to {min(end_index, total_records)} "
+            f"of {total_records}"
+            if total_records > 0
+            else "No records available"
+        )
 
-        prevent_initial_call=True
+        page_information += (
+            f" | Page {active_page} of {total_pages}"
+        )
 
-    )
-
-    def delete_input(n_clicks):
-
-        global list_of_strings
-
-        # Clear blockchain data
-        list_of_strings = []
-
-        return dbc.Alert(
-            "All blockchain records have been deleted.",
-            color="success"
+        return (
+            components,
+            total_pages,
+            active_page,
+            record_count,
+            page_information
         )
 
     return app
 
+
+# --------------------------------------------------
+# RUN APPLICATION
+# --------------------------------------------------
+
 if __name__ == "__main__":
+
     app = create_app()
+
     app.run(debug=True)
