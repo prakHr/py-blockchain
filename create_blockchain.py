@@ -1,6 +1,5 @@
 from justblockchain import justblockchain
 from pprint import pprint
-
 import secrets
 
 def generate_random_hash():
