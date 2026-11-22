@@ -22,7 +22,7 @@ def create_blockchains(list_of_strings):
     return blockchains
 
 if __name__=="__main__":
-    list_of_strings = ["b","a","c"]
+    list_of_strings = ["a","b","bb","a","a","c"]
     blockchains = create_blockchains(list_of_strings)
     pprint(blockchains)
     pprint(len(blockchains))
